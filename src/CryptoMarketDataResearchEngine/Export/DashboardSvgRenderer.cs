@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Linq;
 using CryptoMarketDataResearchEngine.Configuration;
 using CryptoMarketDataResearchEngine.Diagnostics;
 using CryptoMarketDataResearchEngine.Models;
@@ -9,6 +10,8 @@ namespace CryptoMarketDataResearchEngine.Export;
 
 public static class DashboardSvgRenderer
 {
+    private static DateTime? _globalMinTs;
+    private static DateTime? _globalMaxTs;
     private const int Width = 2200;
     private const int ContentX = 150;
     private const int ContentWidth = 1900;
@@ -25,64 +28,70 @@ public static class DashboardSvgRenderer
         Directory.CreateDirectory(outputPath);
         var path = Path.Combine(outputPath, "market-data-pipeline-dashboard.svg");
 
-        var trades = sample.Trades.OrderBy(x => x.TradeTs).ToArray();
-        var depth = sample.Depth.OrderBy(x => x.EventTs).ToArray();
-        var features = sample.Features.OrderBy(x => x.EventTs).ToArray();
-        var changes = sample.Changes.OrderBy(x => x.EventTs).ToArray();
+        // keep an all-rows copy for counts/audit, but downsample visualizations to 500 points
+        var tradesAll = sample.Trades.OrderBy(x => x.TradeTs).ToArray();
+        var depthAll = sample.Depth.OrderBy(x => x.EventTs).ToArray();
+        var featuresAll = sample.Features.OrderBy(x => x.EventTs).ToArray();
+        var changesAll = sample.Changes.OrderBy(x => x.EventTs).ToArray();
 
+        var trades = Downsample<RawAggTradeRow>(tradesAll, x => x.TradeTs, 500);
+        var depth = Downsample<RawDepthRow>(depthAll, x => x.EventTs, 500);
+        var features = Downsample<FeatureRow>(featuresAll, x => x.EventTs, 500);
+        var changes = Downsample<BookChangeRow>(changesAll, x => x.EventTs, 500);
+
+        // compute a global time range across the plotted series so all charts share the same UTC ticks
+        DateTime? globalMin = null;
+        DateTime? globalMax = null;
+        var times = new List<DateTime>();
+        if (trades.Count > 0) { times.Add(trades.First().TradeTs); times.Add(trades.Last().TradeTs); }
+        if (features.Count > 0) { times.Add(features.First().EventTs); times.Add(features.Last().EventTs); }
+        if (depth.Count > 0) { times.Add(depth.First().EventTs); times.Add(depth.Last().EventTs); }
+        if (changes.Count > 0) { times.Add(changes.First().EventTs); times.Add(changes.Last().EventTs); }
+        if (times.Count > 0) { globalMin = times.Min(); globalMax = times.Max(); }
+        _globalMinTs = globalMin;
+        _globalMaxTs = globalMax;
+
+        // Simplified 2-column layout: OHLC full width, then two columns for the remaining panels
         var panels = new StringBuilder();
         var y = 500;
+
+        // OHLC - full width
         AppendPanel(panels, y, "OHLC Candles From Aggregate Trades", "Open, high, low, close candles built from event-level aggTrade prices.",
             RenderOhlc(ChartFrame(y), trades));
         y += PanelHeight + PanelGap;
 
-        AppendPanel(panels, y, "Midprice And L1 Quote", "Best bid, best ask, and midprice reconstructed from the local L5 book.",
-            RenderLineChart(ChartFrame(y), features, x => x.EventTs, "USDT", "0.00",
+        // two-column row 1: Midprice (left), Volume (right)
+        var hGap = 36;
+        var halfW = (ContentWidth - hGap) / 2;
+        AppendPanelAt(panels, ContentX, y, (int)halfW, "Midprice And L1 Quote", "Best bid, best ask, and midprice from the treated L5 book.",
+            RenderLineChart(ChartFrameAt(y, ContentX, halfW), features, x => x.EventTs, "USDT", "0.00",
                 new LineSeries<FeatureRow>("midprice", "#f8fafc", x => x.Midprice),
                 new LineSeries<FeatureRow>("best bid", "#53f3c3", x => x.BestBid),
                 new LineSeries<FeatureRow>("best ask", "#ff6b8a", x => x.BestAsk)));
+        AppendPanelAt(panels, ContentX + (int)halfW + hGap, y, (int)halfW, "Aggregate Trade Volume", "Stacked buy and sell volume per time bucket.",
+            RenderVolume(ChartFrameAt(y, ContentX + halfW + hGap, halfW), trades));
         y += PanelHeight + PanelGap;
 
-        AppendPanel(panels, y, "Aggregate Trade Volume", "Stacked buy and sell volume per time bucket.",
-            RenderVolume(ChartFrame(y), trades));
-        y += PanelHeight + PanelGap;
-
-        AppendPanel(panels, y, "Bid-Ask Spread", "Quoted spread from the treated book. Spikes usually mean a book update widened the top of book.",
-            RenderLineChart(ChartFrame(y), features, x => x.EventTs, "USDT", "0.###",
+        // two-column row 2: Spread (left), Order-Flow Imbalance (right)
+        AppendPanelAt(panels, ContentX, y, (int)halfW, "Bid-Ask Spread", "Quoted spread from the treated book.",
+            RenderLineChart(ChartFrameAt(y, ContentX, halfW), features, x => x.EventTs, "USDT", "0.###",
                 new LineSeries<FeatureRow>("spread", "#ffd166", x => x.Spread)));
-        y += PanelHeight + PanelGap;
-
-        AppendPanel(panels, y, "Order-Flow Imbalance", "Book imbalance and trade imbalance on the configured rolling window.",
-            RenderLineChart(ChartFrame(y), features, x => x.EventTs, "ratio", "0.###",
+        AppendPanelAt(panels, ContentX + (int)halfW + hGap, y, (int)halfW, "Order-Flow Imbalance", "Book imbalance and trade imbalance on the configured rolling window.",
+            RenderLineChart(ChartFrameAt(y, ContentX + halfW + hGap, halfW), features, x => x.EventTs, "ratio", "0.###",
                 new LineSeries<FeatureRow>("book OFI", "#7cc7ff", x => x.OrderFlowImbalance),
                 new LineSeries<FeatureRow>("trade imbalance", "#ff9f43", x => x.TradeImbalance)));
         y += PanelHeight + PanelGap;
 
-        AppendPanel(panels, y, "Top-5 Depth", "Total bid and ask liquidity across the top five book levels.",
-            RenderLineChart(ChartFrame(y), features, x => x.EventTs, "BTC", "0.###",
-                new LineSeries<FeatureRow>("bid depth L5", "#64e572", x => x.TotalBidDepthL5),
-                new LineSeries<FeatureRow>("ask depth L5", "#ff9f9f", x => x.TotalAskDepthL5)));
-        y += PanelHeight + PanelGap;
-
-        AppendPanel(panels, y, "Book Change Mix", "Limit additions versus cancels/trades inferred from per-level quantity deltas.",
-            RenderBookChangeMix(ChartFrame(y), changes));
-        y += PanelHeight + PanelGap;
-
-        var latencySubtitle = options.Mode.Equals("mock", StringComparison.OrdinalIgnoreCase)
-            ? "Mock mode uses deterministic jitter with rare spikes, so it should look irregular but bounded."
-            : "Live mode measures local receive timestamp minus Binance event/trade timestamp; expect jitter and occasional spikes.";
-        AppendPanel(panels, y, "WebSocket Latency Diagnostics", latencySubtitle,
-            RenderLatency(ChartFrame(y), trades, depth));
-        y += PanelHeight + PanelGap;
-
-        AppendPanel(panels, y, "Dataset Health", "Rows written, sample columns, and latency summary for the latest run.",
-            RenderDatasetHealth(ChartFrame(y), rows, latency));
+        // Dataset health - full width bottom
+        AppendPanel(panels, y, "Dataset Health", "Rows written, sample timestamps, missing-data checks, and latency summary for the latest run.",
+            RenderDatasetHealth(ChartFrame(y), rows, latency, sample));
         y += PanelHeight + 86;
 
-        var totalVolume = trades.Sum(x => x.Quantity);
-        var avgSpread = features.Length == 0 ? 0 : features.Average(x => x.Spread);
-        var avgLatency = trades.Select(x => x.ReceiveLatencyMs).Concat(depth.Select(x => x.ReceiveLatencyMs)).DefaultIfEmpty(0).Average();
-        var chartCount = features.Length;
+        // Use counts from the full (undownsampled) arrays for accurate auditing
+        var totalVolume = tradesAll.Sum(x => x.Quantity);
+        var avgSpread = features.Count == 0 ? 0 : features.Select(x => x.Spread).Average();
+        var avgLatency = tradesAll.Select(x => x.ReceiveLatencyMs).Concat(depthAll.Select(x => x.ReceiveLatencyMs)).DefaultIfEmpty(0).Average();
+        var chartCount = featuresAll.Length;
 
         var svg = $$"""
 <svg xmlns="http://www.w3.org/2000/svg" width="{{Width}}" height="{{y}}" viewBox="0 0 {{Width}} {{y}}">
@@ -147,6 +156,16 @@ public static class DashboardSvgRenderer
 """);
     }
 
+    private static void AppendPanelAt(StringBuilder sb, int x, int y, int width, string title, string subtitle, string chart)
+    {
+        sb.AppendLine($$"""
+  <rect x="{{x}}" y="{{y}}" width="{{width}}" height="{{PanelHeight}}" rx="26" class="panel" filter="url(#shadow)"/>
+  <text x="{{x + 36}}" y="{{y + 46}}" class="panel-title">{{Escape(title)}}</text>
+  <text x="{{x + 36}}" y="{{y + 76}}" class="panel-subtitle">{{Escape(subtitle)}}</text>
+  {{chart}}
+""");
+    }
+
     private static string RenderOhlc(Frame frame, IReadOnlyList<RawAggTradeRow> trades)
     {
         if (trades.Count == 0) return Empty(frame, "No aggregate trade rows were captured.");
@@ -178,6 +197,15 @@ public static class DashboardSvgRenderer
         }
 
         sb.Append(Legend(frame, ("up candle", "#53f3c3"), ("down candle", "#ff6b8a")));
+        // add time ticks along the x-axis using the global time range when available
+        if (trades.Count > 0)
+        {
+            var minTs = trades.First().TradeTs;
+            var maxTs = trades.Last().TradeTs;
+            if (_globalMinTs.HasValue) minTs = _globalMinTs.Value;
+            if (_globalMaxTs.HasValue) maxTs = _globalMaxTs.Value;
+            sb.Append(AxisTimeLabels(frame, minTs, maxTs));
+        }
         return sb.ToString();
     }
 
@@ -205,6 +233,14 @@ public static class DashboardSvgRenderer
         }
 
         sb.Append(Legend(frame, ("buy volume", "#39d353"), ("sell volume", "#ff5f6d")));
+        if (buckets.Count > 0)
+        {
+            var minTs = buckets.First().Ts;
+            var maxTs = buckets.Last().Ts;
+            if (_globalMinTs.HasValue) minTs = _globalMinTs.Value;
+            if (_globalMaxTs.HasValue) maxTs = _globalMaxTs.Value;
+            sb.Append(AxisTimeLabels(frame, minTs, maxTs));
+        }
         return sb.ToString();
     }
 
@@ -230,7 +266,7 @@ public static class DashboardSvgRenderer
             new LineSeries<LatencyPoint>("depth latency", "#91b4ff", x => x.Source == "depth" ? x.Value : double.NaN));
     }
 
-    private static string RenderDatasetHealth(Frame frame, IReadOnlyDictionary<string, int> rows, IReadOnlyList<LatencySummary> latency)
+    private static string RenderDatasetHealth(Frame frame, IReadOnlyDictionary<string, int> rows, IReadOnlyList<LatencySummary> latency, MarketDataSample sample)
     {
         var sb = new StringBuilder();
         var x = frame.X;
@@ -239,7 +275,9 @@ public static class DashboardSvgRenderer
         sb.AppendLine($$"""<rect x="{{F(x)}}" y="{{F(y)}}" width="{{F(frame.W)}}" height="{{F(frame.H - 12)}}" rx="18" fill="#0b1627" stroke="#263c56" stroke-width="2"/>""");
         sb.AppendLine($$"""<text x="{{F(x + 32)}}" y="{{F(y + 42)}}" class="label">dataset</text>""");
         sb.AppendLine($$"""<text x="{{F(x + 420)}}" y="{{F(y + 42)}}" class="label">rows</text>""");
-        sb.AppendLine($$"""<text x="{{F(x + 620)}}" y="{{F(y + 42)}}" class="label">research use</text>""");
+        sb.AppendLine($$"""<text x="{{F(x + 520)}}" y="{{F(y + 42)}}" class="label">range (UTC)</text>""");
+        sb.AppendLine($$"""<text x="{{F(x + 920)}}" y="{{F(y + 42)}}" class="label">status</text>""");
+        sb.AppendLine($$"""<text x="{{F(x + 1040)}}" y="{{F(y + 42)}}" class="label">research use</text>""");
 
         var specs = new[]
         {
@@ -254,9 +292,57 @@ public static class DashboardSvgRenderer
         {
             var yy = y + 70 + i * rowH;
             sb.AppendLine($$"""<line x1="{{F(x + 24)}}" y1="{{F(yy - 22)}}" x2="{{F(x + frame.W - 24)}}" y2="{{F(yy - 22)}}" stroke="#24384f" stroke-width="1"/>""");
-            sb.AppendLine($$"""<text x="{{F(x + 32)}}" y="{{F(yy)}}" class="legend">{{Escape(specs[i].Item1)}}</text>""");
-            sb.AppendLine($$"""<text x="{{F(x + 420)}}" y="{{F(yy)}}" class="legend">{{Count(rows, specs[i].Item1)}}</text>""");
-            sb.AppendLine($$"""<text x="{{F(x + 620)}}" y="{{F(yy)}}" class="legend">{{Escape(specs[i].Item2)}}</text>""");
+            var ds = specs[i].Item1;
+            var rc = Count(rows, ds);
+            DateTime? start = null;
+            DateTime? end = null;
+            switch (ds)
+            {
+                case Datasets.RawAggTrades:
+                    if (sample.Trades.Count > 0)
+                    {
+                        start = sample.Trades.Min(t => t.TradeTs);
+                        end = sample.Trades.Max(t => t.TradeTs);
+                    }
+                    break;
+                case Datasets.RawDepth:
+                    if (sample.Depth.Count > 0)
+                    {
+                        start = sample.Depth.Min(t => t.EventTs);
+                        end = sample.Depth.Max(t => t.EventTs);
+                    }
+                    break;
+                case Datasets.BookChangeEvents:
+                    if (sample.Changes.Count > 0)
+                    {
+                        start = sample.Changes.Min(t => t.EventTs);
+                        end = sample.Changes.Max(t => t.EventTs);
+                    }
+                    break;
+                case Datasets.Features:
+                    if (sample.Features.Count > 0)
+                    {
+                        start = sample.Features.Min(t => t.EventTs);
+                        end = sample.Features.Max(t => t.EventTs);
+                    }
+                    break;
+                case Datasets.Snapshots:
+                    if (sample.Snapshots.Count > 0)
+                    {
+                        start = sample.Snapshots.Min(t => t.EventTs);
+                        end = sample.Snapshots.Max(t => t.EventTs);
+                    }
+                    break;
+            }
+
+            var status = rc == 0 ? "MISSING" : (start.HasValue ? "OK" : "WARN");
+            var rangeText = start.HasValue ? $"{start.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} - {end.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} UTC" : "n/a";
+
+            sb.AppendLine($$"""<text x="{{F(x + 32)}}" y="{{F(yy)}}" class="legend">{{Escape(ds)}}</text>""");
+            sb.AppendLine($$"""<text x="{{F(x + 420)}}" y="{{F(yy)}}" class="legend">{{rc}}</text>""");
+            sb.AppendLine($$"""<text x="{{F(x + 520)}}" y="{{F(yy)}}" class="legend">{{Escape(rangeText)}}</text>""");
+            sb.AppendLine($$"""<text x="{{F(x + 920)}}" y="{{F(yy)}}" class="legend">{{Escape(status)}}</text>""");
+            sb.AppendLine($$"""<text x="{{F(x + 1040)}}" y="{{F(yy)}}" class="legend">{{Escape(specs[i].Item2)}}</text>""");
         }
 
         var latencyText = latency.Count == 0
@@ -289,6 +375,8 @@ public static class DashboardSvgRenderer
         var ordered = rows.OrderBy(ts).ToArray();
         var minTs = ts(ordered.First());
         var maxTs = ts(ordered.Last());
+        if (_globalMinTs.HasValue) minTs = _globalMinTs.Value;
+        if (_globalMaxTs.HasValue) maxTs = _globalMaxTs.Value;
         var sb = new StringBuilder(Grid(frame));
         sb.Append(AxisLabels(frame, min, max, format));
         if (min < 0 && max > 0)
@@ -306,6 +394,7 @@ public static class DashboardSvgRenderer
 
         sb.Append(Legend(frame, series.Select(x => (x.Label, x.Color)).ToArray()));
         sb.AppendLine($$"""<text x="{{F(frame.X + frame.W - 12)}}" y="{{F(frame.Y + frame.H + 30)}}" text-anchor="end" class="tiny">{{Escape(unit)}}</text>""");
+        sb.Append(AxisTimeLabels(frame, minTs, maxTs));
         return sb.ToString();
     }
 
@@ -452,6 +541,9 @@ public static class DashboardSvgRenderer
     private static Frame ChartFrame(int panelY) =>
         new(ContentX + 96, panelY + 112, ContentWidth - 142, PanelHeight - 158);
 
+    private static Frame ChartFrameAt(int panelY, double panelX, double panelW) =>
+        new(panelX + 24, panelY + 112, panelW - 48, PanelHeight - 158);
+
     private static string MetricCard(int x, int y, int width, string label, string value, string color) =>
         $$"""
   <rect x="{{x}}" y="{{y}}" width="{{width}}" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
@@ -486,6 +578,33 @@ public static class DashboardSvgRenderer
     {
         if (max < 0.000001) max = 1;
         max *= 1.12;
+    }
+
+    private static string AxisTimeLabels(Frame frame, DateTime minTs, DateTime maxTs)
+    {
+        var sb = new StringBuilder();
+        var span = maxTs - minTs;
+        var tickCount = 5;
+        var format = span.TotalDays >= 1 ? "yyyy-MM-dd HH:mm" : "HH:mm:ss";
+        for (var i = 0; i < tickCount; i++)
+        {
+            var t = minTs + TimeSpan.FromTicks((long)((double)i / (tickCount - 1) * span.Ticks));
+            var x = X(t, minTs, maxTs, frame);
+            sb.AppendLine($$"""<line x1="{{F(x)}}" y1="{{F(frame.Y + frame.H)}}" x2="{{F(x)}}" y2="{{F(frame.Y + frame.H + 8)}}" stroke="#2f4b62" stroke-width="2"/>""");
+            sb.AppendLine($$"""<text x="{{F(x)}}" y="{{F(frame.Y + frame.H + 30)}}" text-anchor="middle" class="tick">{{t.ToString(format, CultureInfo.InvariantCulture)}}</text>""");
+        }
+
+        return sb.ToString();
+    }
+
+    private static IReadOnlyList<T> Downsample<T>(IReadOnlyList<T> rows, Func<T, DateTime> tsSelector, int maxPoints)
+    {
+        if (rows == null) return Array.Empty<T>();
+        if (rows.Count <= maxPoints) return rows;
+        var ordered = rows.OrderBy(tsSelector).ToArray();
+        var n = ordered.Length;
+        var start = Math.Max(0, n - maxPoints);
+        return ordered.Skip(start).ToArray();
     }
 
     private static int Count(IReadOnlyDictionary<string, int> rows, string dataset) =>

@@ -114,17 +114,25 @@ Generates the large dashboard image at `charts/market-data-pipeline-dashboard.sv
 
 The generated SVG is intentionally arranged as a single centered research dashboard instead of a two-column grid. All time-series panels are stacked vertically so each chart has the same width and comparable time axis.
 
-Dashboard panels:
+Dashboard panels (simplified):
 
-- OHLC candlesticks built from aggregate trade prices.
-- Midprice, best bid, and best ask from the treated L5 book.
-- Buy/sell aggregate trade volume.
-- Bid-ask spread.
-- Book order-flow imbalance and rolling trade imbalance.
-- Top-5 bid and ask depth.
-- Book change mix: limit additions versus cancel-or-trade deltas.
+- OHLC candlesticks built from aggregate trade prices (time-bucketed).
+- Midprice, best bid, and best ask reconstructed from the treated L5 book (L1 quote).
+- Aggregate buy/sell trade volume (stacked bars).
 - WebSocket latency diagnostics for aggregate trades and depth updates.
 - Dataset health table with row counts and latency summary.
+
+Notes:
+
+- Visualizations are downsampled to a maximum of 500 plotted datapoints per series to keep the SVG size reasonable while preserving the full captured dataset for auditing and metrics.
+- The dashboard renderer now draws x-axis time ticks and a time legend for each panel.
+- Metric cards use the full, undownsampled row counts so captured-data counts remain accurate.
+- The dashboard SVG is produced by `Export/DashboardSvgRenderer.cs` and written to `charts/market-data-pipeline-dashboard.svg`.
+- To regenerate the dashboard as part of the smoke test, run:
+
+```bash
+dotnet run --project tests/CryptoMarketDataResearchEngine.SmokeTests
+```
 
 Latency interpretation:
 
