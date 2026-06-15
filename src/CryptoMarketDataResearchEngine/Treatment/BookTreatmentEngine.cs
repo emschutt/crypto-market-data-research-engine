@@ -104,7 +104,7 @@ public sealed class BookTreatmentEngine
 
         return new FeatureRow(
             EventTs: eventTs,
-            LocalComputeTs: DateTime.UtcNow,
+            LocalComputeTs: _options.Mode.Equals("mock", StringComparison.OrdinalIgnoreCase) ? eventTs : DateTime.UtcNow,
             Symbol: _options.SymbolUpper,
             FeatureIntervalMs: _options.FeatureIntervalMs,
             RollingWindowMs: _options.RollingWindowMs,

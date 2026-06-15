@@ -38,24 +38,31 @@ public sealed class BinanceWebSocketCollector : IMarketDataCollector
         await ws.ConnectAsync(new Uri(url), timeout.Token);
 
         var buffer = new byte[128 * 1024];
-        while (ws.State == WebSocketState.Open && !timeout.IsCancellationRequested)
+        try
         {
-            using var ms = new MemoryStream();
-            WebSocketReceiveResult result;
-            do
+            while (ws.State == WebSocketState.Open && !timeout.IsCancellationRequested)
             {
-                result = await ws.ReceiveAsync(buffer, timeout.Token);
-                if (result.Count > 0)
-                    ms.Write(buffer, 0, result.Count);
+                using var ms = new MemoryStream();
+                WebSocketReceiveResult result;
+                do
+                {
+                    result = await ws.ReceiveAsync(buffer, timeout.Token);
+                    if (result.Count > 0)
+                        ms.Write(buffer, 0, result.Count);
+                }
+                while (!result.EndOfMessage && result.MessageType == WebSocketMessageType.Text);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                    break;
+                if (result.MessageType != WebSocketMessageType.Text)
+                    continue;
+
+                ProcessMessage(Encoding.UTF8.GetString(ms.ToArray()));
             }
-            while (!result.EndOfMessage && result.MessageType == WebSocketMessageType.Text);
-
-            if (result.MessageType == WebSocketMessageType.Close)
-                break;
-            if (result.MessageType != WebSocketMessageType.Text)
-                continue;
-
-            ProcessMessage(Encoding.UTF8.GetString(ms.ToArray()));
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            // Expected path when the requested capture duration expires while ReceiveAsync is blocked.
         }
 
         var rows = await _sink.FlushAsync(CancellationToken.None);
