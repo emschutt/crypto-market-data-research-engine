@@ -36,7 +36,7 @@ try
         }
         default:
             Console.Error.WriteLine("Usage:");
-            Console.Error.WriteLine("  dotnet run --project src/CryptoMarketDataResearchEngine -- collect --mode mock --duration 3 --output sample_data/smoke");
+            Console.Error.WriteLine("  dotnet run --project src/CryptoMarketDataResearchEngine -- collect --mode mock --duration 10 --output sample_data/smoke");
             Console.Error.WriteLine("  dotnet run --project src/CryptoMarketDataResearchEngine -- collect --mode live --duration 30 --output data/binance");
             Console.Error.WriteLine("  dotnet run --project src/CryptoMarketDataResearchEngine -- smoke");
             Console.Error.WriteLine("  dotnet run --project src/CryptoMarketDataResearchEngine -- inspect --output sample_data/smoke");

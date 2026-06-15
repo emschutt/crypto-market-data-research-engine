@@ -144,7 +144,147 @@ Datasets:
 - `features`: best bid, best ask, midprice, spread, microprice, L5 depth, order-flow imbalance, trade imbalance, rolling add/cancel quantities.
 - `snapshots`: REST depth snapshot metadata and serialized top book levels.
 
-Each Parquet file also gets a small `.meta.json` sidecar with dataset name, row count, symbol, exchange, and write timestamp.
+## Captured Data Inventory
+
+This is the complete persisted data contract written by the current pipeline.
+
+`raw_agg_trades`
+
+One row per Binance aggregate trade event.
+
+- `event_ts_ms`: Binance event timestamp in Unix milliseconds.
+- `event_ts_iso`: Binance event timestamp in ISO-8601 UTC format.
+- `trade_ts_ms`: Binance trade timestamp in Unix milliseconds.
+- `local_receive_ts_ms`: local machine receive timestamp in Unix milliseconds.
+- `symbol`: normalized symbol, for example `BTCUSDT`.
+- `exchange`: constant exchange label, currently `binance`.
+- `agg_trade_id`: Binance aggregate trade id.
+- `first_trade_id`: first raw trade id included in the aggregate trade.
+- `last_trade_id`: last raw trade id included in the aggregate trade.
+- `price`: aggregate trade price.
+- `quantity`: aggregate trade base-asset quantity.
+- `buyer_is_maker`: Binance maker-side flag.
+- `trade_side`: inferred aggressive side; `buy` when buyer is taker, `sell` when buyer is maker.
+- `receive_latency_ms`: local receive time minus Binance trade timestamp.
+- `raw_payload_json`: original exchange payload when `--raw-payload true`; empty string otherwise.
+
+`raw_depth`
+
+One row per Binance depth update frame.
+
+- `event_ts_ms`: Binance depth event timestamp in Unix milliseconds.
+- `event_ts_iso`: Binance depth event timestamp in ISO-8601 UTC format.
+- `local_receive_ts_ms`: local machine receive timestamp in Unix milliseconds.
+- `symbol`: normalized symbol.
+- `exchange`: constant exchange label, currently `binance`.
+- `first_update_id`: first Binance order-book update id in the frame.
+- `last_update_id`: final Binance order-book update id in the frame.
+- `bid_updates_json`: serialized bid price/size updates from the frame.
+- `ask_updates_json`: serialized ask price/size updates from the frame.
+- `bid_update_count`: number of bid levels included in the frame.
+- `ask_update_count`: number of ask levels included in the frame.
+- `receive_latency_ms`: local receive time minus Binance depth event timestamp.
+- `raw_payload_json`: original exchange payload when `--raw-payload true`; empty string otherwise.
+
+`book_change_events`
+
+One row per changed book level after applying a depth update to the local book.
+
+- `event_ts_ms`: source depth event timestamp in Unix milliseconds.
+- `event_ts_iso`: source depth event timestamp in ISO-8601 UTC format.
+- `local_receive_ts_ms`: local receive timestamp in Unix milliseconds.
+- `symbol`: normalized symbol.
+- `exchange`: constant exchange label, currently `binance`.
+- `event_type`: `limit_add` when displayed quantity increases, otherwise `cancel_or_trade`.
+- `side`: `bid` or `ask`.
+- `price`: changed price level.
+- `previous_quantity`: quantity at that price before the update.
+- `new_quantity`: quantity at that price after the update.
+- `delta_quantity`: signed quantity change.
+- `absolute_delta_quantity`: absolute quantity change.
+- `is_best_level`: whether the updated level was the best level before applying the side update.
+- `first_update_id`: first Binance update id from the source frame.
+- `last_update_id`: final Binance update id from the source frame.
+- `book_last_update_id`: local book update id after applying the event.
+
+`features`
+
+One row per treated depth event by default. Set `--feature-interval-ms` above zero to throttle derived feature emission.
+
+- `event_ts_ms`: feature event timestamp in Unix milliseconds.
+- `event_ts_iso`: feature event timestamp in ISO-8601 UTC format.
+- `local_compute_ts_ms`: local feature-computation timestamp in Unix milliseconds.
+- `symbol`: normalized symbol.
+- `exchange`: constant exchange label, currently `binance`.
+- `feature_interval_ms`: configured minimum feature interval. `0` means one feature row per depth event.
+- `rolling_window_ms`: configured rolling window for trade-flow and book-change features.
+- `book_last_update_id`: latest local book update id included in the feature row.
+- `best_bid`: best bid price.
+- `best_ask`: best ask price.
+- `midprice`: `(best_bid + best_ask) / 2`.
+- `spread`: `best_ask - best_bid`, floored at zero.
+- `microprice`: queue-size weighted top-of-book price.
+- `best_bid_size`: displayed quantity at best bid.
+- `best_ask_size`: displayed quantity at best ask.
+- `total_bid_depth_l5`: total displayed bid depth across the top five bid levels.
+- `total_ask_depth_l5`: total displayed ask depth across the top five ask levels.
+- `bid_l1_price`: level-1 bid price.
+- `bid_l2_price`: level-2 bid price.
+- `bid_l3_price`: level-3 bid price.
+- `bid_l4_price`: level-4 bid price.
+- `bid_l5_price`: level-5 bid price.
+- `bid_l1_size`: level-1 bid quantity.
+- `bid_l2_size`: level-2 bid quantity.
+- `bid_l3_size`: level-3 bid quantity.
+- `bid_l4_size`: level-4 bid quantity.
+- `bid_l5_size`: level-5 bid quantity.
+- `ask_l1_price`: level-1 ask price.
+- `ask_l2_price`: level-2 ask price.
+- `ask_l3_price`: level-3 ask price.
+- `ask_l4_price`: level-4 ask price.
+- `ask_l5_price`: level-5 ask price.
+- `ask_l1_size`: level-1 ask quantity.
+- `ask_l2_size`: level-2 ask quantity.
+- `ask_l3_size`: level-3 ask quantity.
+- `ask_l4_size`: level-4 ask quantity.
+- `ask_l5_size`: level-5 ask quantity.
+- `order_flow_imbalance`: `(total_bid_depth_l5 - total_ask_depth_l5) / (total_bid_depth_l5 + total_ask_depth_l5)`.
+- `buy_trade_volume_window`: rolling aggressive buy volume.
+- `sell_trade_volume_window`: rolling aggressive sell volume.
+- `trade_imbalance`: `(buy_trade_volume_window - sell_trade_volume_window) / total rolling trade volume`.
+- `limit_add_bid_window`: rolling bid-side displayed quantity additions.
+- `limit_add_ask_window`: rolling ask-side displayed quantity additions.
+- `cancel_bid_window`: rolling bid-side displayed quantity removals.
+- `cancel_ask_window`: rolling ask-side displayed quantity removals.
+
+`snapshots`
+
+One row per REST depth snapshot used to bootstrap the local book.
+
+- `event_ts_ms`: snapshot capture timestamp in Unix milliseconds.
+- `event_ts_iso`: snapshot capture timestamp in ISO-8601 UTC format.
+- `local_receive_ts_ms`: local receive timestamp in Unix milliseconds.
+- `symbol`: normalized symbol.
+- `exchange`: constant exchange label, currently `binance`.
+- `last_update_id`: Binance snapshot update id.
+- `bids_json`: serialized bid levels from the snapshot.
+- `asks_json`: serialized ask levels from the snapshot.
+- `bid_level_count`: number of bid levels included in the snapshot.
+- `ask_level_count`: number of ask levels included in the snapshot.
+- `depth_synchronized`: whether the local depth bootstrap completed successfully.
+- `resync_count`: reserved counter for future depth resync tracking.
+
+Sidecar metadata for every Parquet file:
+
+- `dataset`: dataset name.
+- `symbol`: normalized symbol.
+- `exchange`: exchange label.
+- `rows`: number of rows in the Parquet file.
+- `hour_utc`: partition hour represented by the file.
+- `file`: Parquet file name.
+- `schema_version`: schema identifier, currently `event-level-v1`.
+
+Each Parquet file also gets a small `.meta.json` sidecar with dataset name, row count, symbol, exchange, partition hour, file name, and schema version.
 
 ## Requirements
 
@@ -166,7 +306,7 @@ Command-line options can be passed directly:
 dotnet run --project src/CryptoMarketDataResearchEngine -- collect \
   --mode mock \
   --symbol BTCUSDT \
-  --duration 3 \
+  --duration 10 \
   --output sample_data/smoke \
   --dataset all \
   --feature-interval-ms 0 \
@@ -179,7 +319,7 @@ The same values can be supplied through environment variables:
 SYMBOL=BTCUSDT
 MODE=mock
 OUTPUT_PATH=sample_data/smoke
-CAPTURE_DURATION_SECONDS=3
+CAPTURE_DURATION_SECONDS=10
 DATASET_TYPE=all
 REST_DEPTH_LIMIT=1000
 FEATURE_INTERVAL_MS=0
@@ -212,7 +352,7 @@ Passing result from this local run:
 ```text
 SMOKE TEST PASSED
 output_path=sample_data/smoke
-rows_written={"raw_depth":300,"raw_agg_trades":300,"book_change_events":300,"features":300,"snapshots":1}
+rows_written={"raw_depth":1000,"raw_agg_trades":1000,"book_change_events":1000,"features":1000,"snapshots":1}
 chart=charts/market-data-pipeline-dashboard.svg
 ```
 

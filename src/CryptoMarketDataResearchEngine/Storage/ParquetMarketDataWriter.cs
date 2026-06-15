@@ -227,6 +227,26 @@ public sealed class ParquetMarketDataWriter : IMarketDataSink
         var bestAskSize = new DataField<double>("best_ask_size");
         var totalBidDepthL5 = new DataField<double>("total_bid_depth_l5");
         var totalAskDepthL5 = new DataField<double>("total_ask_depth_l5");
+        var bidL1Price = new DataField<double>("bid_l1_price");
+        var bidL2Price = new DataField<double>("bid_l2_price");
+        var bidL3Price = new DataField<double>("bid_l3_price");
+        var bidL4Price = new DataField<double>("bid_l4_price");
+        var bidL5Price = new DataField<double>("bid_l5_price");
+        var bidL1Size = new DataField<double>("bid_l1_size");
+        var bidL2Size = new DataField<double>("bid_l2_size");
+        var bidL3Size = new DataField<double>("bid_l3_size");
+        var bidL4Size = new DataField<double>("bid_l4_size");
+        var bidL5Size = new DataField<double>("bid_l5_size");
+        var askL1Price = new DataField<double>("ask_l1_price");
+        var askL2Price = new DataField<double>("ask_l2_price");
+        var askL3Price = new DataField<double>("ask_l3_price");
+        var askL4Price = new DataField<double>("ask_l4_price");
+        var askL5Price = new DataField<double>("ask_l5_price");
+        var askL1Size = new DataField<double>("ask_l1_size");
+        var askL2Size = new DataField<double>("ask_l2_size");
+        var askL3Size = new DataField<double>("ask_l3_size");
+        var askL4Size = new DataField<double>("ask_l4_size");
+        var askL5Size = new DataField<double>("ask_l5_size");
         var orderFlowImbalance = new DataField<double>("order_flow_imbalance");
         var buyTradeVolumeWindow = new DataField<double>("buy_trade_volume_window");
         var sellTradeVolumeWindow = new DataField<double>("sell_trade_volume_window");
@@ -238,8 +258,10 @@ public sealed class ParquetMarketDataWriter : IMarketDataSink
 
         var schema = new ParquetSchema(eventTsMs, eventTsIso, localComputeTsMs, symbol, exchange, featureIntervalMs,
             rollingWindowMs, bookLastUpdateId, bestBid, bestAsk, midprice, spread, microprice, bestBidSize, bestAskSize,
-            totalBidDepthL5, totalAskDepthL5, orderFlowImbalance, buyTradeVolumeWindow, sellTradeVolumeWindow,
-            tradeImbalance, limitAddBidWindow, limitAddAskWindow, cancelBidWindow, cancelAskWindow);
+            totalBidDepthL5, totalAskDepthL5, bidL1Price, bidL2Price, bidL3Price, bidL4Price, bidL5Price, bidL1Size,
+            bidL2Size, bidL3Size, bidL4Size, bidL5Size, askL1Price, askL2Price, askL3Price, askL4Price, askL5Price,
+            askL1Size, askL2Size, askL3Size, askL4Size, askL5Size, orderFlowImbalance, buyTradeVolumeWindow,
+            sellTradeVolumeWindow, tradeImbalance, limitAddBidWindow, limitAddAskWindow, cancelBidWindow, cancelAskWindow);
 
         await WriteColumnsAsync(filePath, schema,
         [
@@ -260,6 +282,26 @@ public sealed class ParquetMarketDataWriter : IMarketDataSink
             Col(bestAskSize, rows, x => x.BestAskSize),
             Col(totalBidDepthL5, rows, x => x.TotalBidDepthL5),
             Col(totalAskDepthL5, rows, x => x.TotalAskDepthL5),
+            Col(bidL1Price, rows, x => x.BidL1Price),
+            Col(bidL2Price, rows, x => x.BidL2Price),
+            Col(bidL3Price, rows, x => x.BidL3Price),
+            Col(bidL4Price, rows, x => x.BidL4Price),
+            Col(bidL5Price, rows, x => x.BidL5Price),
+            Col(bidL1Size, rows, x => x.BidL1Size),
+            Col(bidL2Size, rows, x => x.BidL2Size),
+            Col(bidL3Size, rows, x => x.BidL3Size),
+            Col(bidL4Size, rows, x => x.BidL4Size),
+            Col(bidL5Size, rows, x => x.BidL5Size),
+            Col(askL1Price, rows, x => x.AskL1Price),
+            Col(askL2Price, rows, x => x.AskL2Price),
+            Col(askL3Price, rows, x => x.AskL3Price),
+            Col(askL4Price, rows, x => x.AskL4Price),
+            Col(askL5Price, rows, x => x.AskL5Price),
+            Col(askL1Size, rows, x => x.AskL1Size),
+            Col(askL2Size, rows, x => x.AskL2Size),
+            Col(askL3Size, rows, x => x.AskL3Size),
+            Col(askL4Size, rows, x => x.AskL4Size),
+            Col(askL5Size, rows, x => x.AskL5Size),
             Col(orderFlowImbalance, rows, x => x.OrderFlowImbalance),
             Col(buyTradeVolumeWindow, rows, x => x.BuyTradeVolumeWindow),
             Col(sellTradeVolumeWindow, rows, x => x.SellTradeVolumeWindow),
