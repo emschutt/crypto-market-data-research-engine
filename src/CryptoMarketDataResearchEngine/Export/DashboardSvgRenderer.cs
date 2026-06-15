@@ -129,7 +129,7 @@ public static class DashboardSvgRenderer
   <rect width="{{Width}}" height="{{y}}" fill="url(#glow)"/>
 
   <text x="{{Width / 2}}" y="90" text-anchor="middle" class="eyebrow">EVENT-LEVEL MARKET DATA RESEARCH ENGINE</text>
-  <text x="{{Width / 2}}" y="176" text-anchor="middle" class="title">{{Escape(options.SymbolUpper)}} Market Data Research Dashboard</text>
+    <text x="{{Width / 2}}" y="176" text-anchor="middle" class="title">BTCUSDT Market Data Dashboard</text>
   <text x="{{Width / 2}}" y="224" text-anchor="middle" class="subtitle">High-frequency aggregate trades, L5 depth features, order-flow imbalance, OHLC candles, and latency diagnostics</text>
 
     {{MetricCard(ContentX, 290, 340, "Depth Updates", Count(rows, Datasets.RawDepth).ToString(CultureInfo.InvariantCulture), "#7cc7ff")}}

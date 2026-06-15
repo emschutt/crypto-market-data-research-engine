@@ -33,7 +33,7 @@
   <rect width="2200" height="2112" fill="url(#glow)"/>
 
   <text x="1100" y="90" text-anchor="middle" class="eyebrow">EVENT-LEVEL MARKET DATA RESEARCH ENGINE</text>
-  <text x="1100" y="176" text-anchor="middle" class="title">BTCUSDT Market Data Research Dashboard</text>
+    <text x="1100" y="176" text-anchor="middle" class="title">BTCUSDT Market Data Dashboard</text>
   <text x="1100" y="224" text-anchor="middle" class="subtitle">High-frequency aggregate trades, L5 depth features, order-flow imbalance, OHLC candles, and latency diagnostics</text>
 
       <rect x="150" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
