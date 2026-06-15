@@ -1,0 +1,8 @@
+{
+  "dataset": "raw_agg_trades",
+  "symbol": "BTCUSDT",
+  "rows": 12,
+  "format": "parquet",
+  "first_timestamp": "2026-06-15 21:26:28+00:00",
+  "last_timestamp": "2026-06-15 21:26:29.100000+00:00"
+}
