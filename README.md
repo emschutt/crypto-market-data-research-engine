@@ -18,7 +18,7 @@ The project captures Binance market data at event level and writes typed dataset
 - Stores each dataset as hive-partitioned Parquet.
 - Tracks receive latency for WebSocket diagnostics.
 - Produces a large centered SVG dashboard with stacked time-series panels, OHLC candles, volume, spread, imbalance, depth, book-change mix, latency, and dataset health.
-- Includes a smoke test that runs the full mock pipeline, writes Parquet, reads it back, validates columns, and exits successfully.
+- Includes a smoke test that runs the full mock pipeline, writes Parquet, reads it back, validates columns, checks data-quality invariants, and exits successfully.
 
 ## Architecture
 
@@ -101,6 +101,10 @@ Writes typed datasets to Parquet. Files are partitioned by dataset, symbol, UTC 
 `Diagnostics/WebSocketLatencyTracker.cs`
 
 Tracks event timestamp versus local receive timestamp so live runs can report WebSocket receive-latency summaries.
+
+`Diagnostics/MarketDataQualityValidator.cs`
+
+Checks that captured values are internally coherent. The smoke test fails if any strict validation check fails.
 
 `Export/DashboardSvgRenderer.cs`
 
@@ -286,6 +290,38 @@ Sidecar metadata for every Parquet file:
 
 Each Parquet file also gets a small `.meta.json` sidecar with dataset name, row count, symbol, exchange, partition hour, file name, and schema version.
 
+## Automated Quality Checks
+
+Every capture run attaches a `QualityChecks` array to the JSON result. The smoke test runs these checks in strict mode.
+
+The validator checks:
+
+- Required row counts for mock smoke output.
+- Snapshot presence and synchronization flag.
+- Monotonic timestamps for depth, trade, and feature rows.
+- Symbol consistency across all sampled rows.
+- Positive trade prices and quantities.
+- Correct `trade_side` mapping from Binance `buyer_is_maker`.
+- Ordered trade id and depth update id ranges.
+- Non-negative receive latency.
+- Bounded synthetic latency in mock mode.
+- Non-negative displayed quantities after book updates.
+- Correct `absolute_delta_quantity = abs(delta_quantity)`.
+- Valid book-change `event_type` and `side` values.
+- Positive best bid and best ask.
+- Non-crossed book: `best_bid <= best_ask`.
+- Correct spread calculation.
+- Correct midprice calculation.
+- Microprice inside the best bid/ask quote.
+- Non-negative top-five bid and ask depth.
+- Best bid/ask sizes matching L1 size columns.
+- L1-L5 bid ladder sorted descending.
+- L1-L5 ask ladder sorted ascending.
+- Order-flow imbalance and trade imbalance within `[-1, 1]`.
+- Non-negative rolling trade, limit-add, and cancel quantities.
+
+For live runs, row-count minimums are reported but not enforced because short captures can legitimately have sparse trade activity.
+
 ## Requirements
 
 - .NET SDK 10.0 or newer.
@@ -352,7 +388,8 @@ Passing result from this local run:
 ```text
 SMOKE TEST PASSED
 output_path=sample_data/smoke
-rows_written={"raw_depth":1000,"raw_agg_trades":1000,"book_change_events":1000,"features":1000,"snapshots":1}
+rows_written={"raw_depth":1000,"raw_agg_trades":1000,"book_change_events":3995,"features":1000,"snapshots":1}
+quality_checks=34/34 passed
 chart=charts/market-data-pipeline-dashboard.svg
 ```
 

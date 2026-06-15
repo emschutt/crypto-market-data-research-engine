@@ -23,8 +23,15 @@ public static class PipelineRunner
             : new MockBinanceCollector(options, sink, latency);
 
         var result = await collector.RunAsync(ct);
-        DashboardSvgRenderer.Render(options, result.RowsWritten, sink.Snapshot(), result.Latency, "charts");
-        return result;
+        var sample = sink.Snapshot();
+        var qualityChecks = MarketDataQualityValidator.Validate(
+            options,
+            result.RowsWritten,
+            sample,
+            strict: options.Mode.Equals("mock", StringComparison.OrdinalIgnoreCase));
+        MarketDataQualityValidator.ThrowIfFailed(qualityChecks);
+        DashboardSvgRenderer.Render(options, result.RowsWritten, sample, result.Latency, "charts");
+        return result with { QualityChecks = qualityChecks };
     }
 
     public static async Task SmokeAsync(CancellationToken ct = default)
@@ -67,6 +74,7 @@ public static class PipelineRunner
         Console.WriteLine("SMOKE TEST PASSED");
         Console.WriteLine($"output_path={Path.GetFullPath(options.OutputPath)}");
         Console.WriteLine($"rows_written={JsonSerializer.Serialize(result.RowsWritten)}");
+        Console.WriteLine($"quality_checks={result.QualityChecks.Count(x => x.Passed)}/{result.QualityChecks.Count} passed");
         Console.WriteLine($"chart={Path.GetFullPath(Path.Combine("charts", "market-data-pipeline-dashboard.svg"))}");
     }
 

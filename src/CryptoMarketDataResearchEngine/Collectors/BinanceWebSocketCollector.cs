@@ -66,7 +66,7 @@ public sealed class BinanceWebSocketCollector : IMarketDataCollector
         }
 
         var rows = await _sink.FlushAsync(CancellationToken.None);
-        return new CaptureResult(_options.Mode, _options.SymbolUpper, Path.GetFullPath(_options.OutputPath), rows, _latency.Summaries());
+        return new CaptureResult(_options.Mode, _options.SymbolUpper, Path.GetFullPath(_options.OutputPath), rows, _latency.Summaries(), []);
     }
 
     private async Task BootstrapBookAsync(CancellationToken ct)

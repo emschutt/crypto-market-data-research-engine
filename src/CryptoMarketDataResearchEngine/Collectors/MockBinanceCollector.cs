@@ -29,12 +29,14 @@ public sealed class MockBinanceCollector : IMarketDataCollector
         var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         const double basePrice = 65_000;
         var lastUpdateId = 1_000_000L;
+        double? previousMockBid = null;
+        double? previousMockAsk = null;
 
         var bids = Enumerable.Range(1, 20)
-            .Select(i => new Level(Math.Round(basePrice - i * 0.5, 2), 1.0 + i * 0.18))
+            .Select(i => new Level(Math.Round(basePrice - 100 - i * 0.5, 2), 1.0 + i * 0.18))
             .ToArray();
         var asks = Enumerable.Range(1, 20)
-            .Select(i => new Level(Math.Round(basePrice + i * 0.5, 2), 1.0 + i * 0.18))
+            .Select(i => new Level(Math.Round(basePrice + 100 + i * 0.5, 2), 1.0 + i * 0.18))
             .ToArray();
         _sink.Enqueue(_book.ApplySnapshot(lastUpdateId, bids, asks, start));
 
@@ -50,11 +52,22 @@ public sealed class MockBinanceCollector : IMarketDataCollector
             if (i > events * 0.44 && i < events * 0.54) priceShift += 24.0;
             if (i > events * 0.70) priceShift -= 14.0;
 
-            var side = i % 2 == 0 ? "bid" : "ask";
-            var price = Math.Round(basePrice + priceShift + (side == "bid" ? -0.5 : 0.5), 2);
-            var size = Math.Round(Math.Max(0, 1.0 + Math.Sin(i / 13.0) * 0.7 + rng.NextDouble() * 0.8), 6);
-            var bidUpdates = side == "bid" ? new[] { new Level(price, size) } : [];
-            var askUpdates = side == "ask" ? new[] { new Level(price, size) } : [];
+            var quoteMid = basePrice + priceShift;
+            var halfSpread = 0.25 + Math.Abs(Math.Sin(i / 29.0)) * 0.75;
+            var bidPrice = Math.Round(quoteMid - halfSpread, 2);
+            var askPrice = Math.Round(quoteMid + halfSpread, 2);
+            var bidSize = Math.Round(Math.Max(0.05, 1.0 + Math.Sin(i / 13.0) * 0.7 + rng.NextDouble() * 0.8), 6);
+            var askSize = Math.Round(Math.Max(0.05, 1.0 + Math.Cos(i / 17.0) * 0.7 + rng.NextDouble() * 0.8), 6);
+            var bidUpdates = new List<Level>();
+            var askUpdates = new List<Level>();
+            if (previousMockBid is { } oldBid && Math.Abs(oldBid - bidPrice) > double.Epsilon)
+                bidUpdates.Add(new Level(oldBid, 0));
+            if (previousMockAsk is { } oldAsk && Math.Abs(oldAsk - askPrice) > double.Epsilon)
+                askUpdates.Add(new Level(oldAsk, 0));
+            bidUpdates.Add(new Level(bidPrice, bidSize));
+            askUpdates.Add(new Level(askPrice, askSize));
+            previousMockBid = bidPrice;
+            previousMockAsk = askPrice;
             var updateId = lastUpdateId + i + 1;
 
             var rawDepth = new RawDepthRow(
@@ -65,8 +78,8 @@ public sealed class MockBinanceCollector : IMarketDataCollector
                 LastUpdateId: updateId,
                 BidUpdatesJson: JsonSerializer.Serialize(bidUpdates),
                 AskUpdatesJson: JsonSerializer.Serialize(askUpdates),
-                BidUpdateCount: bidUpdates.Length,
-                AskUpdateCount: askUpdates.Length,
+                BidUpdateCount: bidUpdates.Count,
+                AskUpdateCount: askUpdates.Count,
                 ReceiveLatencyMs: _latency.Record("mock.depth", eventTs, depthReceiveTs),
                 RawPayloadJson: _options.RawPayload ? JsonSerializer.Serialize(new { e = "depthUpdate", U = updateId, u = updateId }) : "");
             _sink.Enqueue(rawDepth);
@@ -85,7 +98,7 @@ public sealed class MockBinanceCollector : IMarketDataCollector
                 AggTradeId: 900_000 + i,
                 FirstTradeId: 800_000 + i,
                 LastTradeId: 800_000 + i,
-                Price: Math.Round(basePrice + priceShift + (rng.NextDouble() - 0.5) * 5, 2),
+                Price: Math.Round(quoteMid + (rng.NextDouble() - 0.5) * halfSpread, 2),
                 Quantity: quantity,
                 BuyerIsMaker: buyerIsMaker,
                 TradeSide: buyerIsMaker ? "sell" : "buy",
@@ -101,6 +114,6 @@ public sealed class MockBinanceCollector : IMarketDataCollector
         }
 
         var rows = await _sink.FlushAsync(ct);
-        return new CaptureResult(_options.Mode, _options.SymbolUpper, Path.GetFullPath(_options.OutputPath), rows, _latency.Summaries());
+        return new CaptureResult(_options.Mode, _options.SymbolUpper, Path.GetFullPath(_options.OutputPath), rows, _latency.Summaries(), []);
     }
 }

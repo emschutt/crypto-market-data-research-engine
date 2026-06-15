@@ -7,4 +7,5 @@ public sealed record CaptureResult(
     string Symbol,
     string OutputPath,
     IReadOnlyDictionary<string, int> RowsWritten,
-    IReadOnlyList<LatencySummary> Latency);
+    IReadOnlyList<LatencySummary> Latency,
+    IReadOnlyList<QualityCheck> QualityChecks);
