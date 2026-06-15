@@ -18,7 +18,7 @@ async def run_mock_capture(
     latency: WebSocketLatencyTracker,
 ) -> dict[str, int]:
     rng = Random(42)
-    steps = max(8, int(config.capture_duration_seconds * 10))
+    steps = max(30, int(config.capture_duration_seconds * 10))
     start = datetime.now(timezone.utc).replace(microsecond=0)
     base_price = 65_000.0
     last_update_id = 1_000_000
@@ -29,8 +29,8 @@ async def run_mock_capture(
     feature_rows: list[FeatureBarRow] = []
     snapshot_rows: list[SnapshotRow] = []
 
-    bids = {base_price - i * 0.5: 1.0 + i * 0.2 for i in range(1, 8)}
-    asks = {base_price + i * 0.5: 1.0 + i * 0.2 for i in range(1, 8)}
+    bids = {round(base_price - i * 0.5, 2): 1.0 + i * 0.2 for i in range(1, 12)}
+    asks = {round(base_price + i * 0.5, 2): 1.0 + i * 0.2 for i in range(1, 12)}
 
     snapshot_rows.append(
         SnapshotRow(
@@ -51,13 +51,17 @@ async def run_mock_capture(
         event_ts = start + timedelta(milliseconds=i * config.bar_ms)
         local_ts = event_ts + timedelta(milliseconds=4 + (i % 5))
         final_update_id = last_update_id + i + 1
-        price_shift = math.sin(i / 4.0) * 7.0
+        drift = i * 0.045
+        cyclical_move = math.sin(i / 8.0) * 18.0 + math.sin(i / 23.0) * 8.0
+        impulse = 22.0 if steps * 0.42 < i < steps * 0.52 else 0.0
+        price_shift = drift + cyclical_move + impulse
 
-        side = "bid" if i % 2 == 0 else "ask"
+        side = "bid" if (i + int(abs(math.sin(i / 6.0)) * 10)) % 2 == 0 else "ask"
         book = bids if side == "bid" else asks
-        price = (base_price - 0.5 if side == "bid" else base_price + 0.5) + round(price_shift, 1)
+        price = round((base_price - 0.5 if side == "bid" else base_price + 0.5) + price_shift, 2)
         previous_size = float(book.get(price, 0.0))
-        new_size = max(previous_size + rng.choice([-0.35, 0.25, 0.5]), 0.0)
+        liquidity_pulse = 0.35 if steps * 0.25 < i < steps * 0.38 else -0.2 if steps * 0.60 < i < steps * 0.72 else 0.0
+        new_size = max(previous_size + rng.choice([-0.45, -0.2, 0.25, 0.5, 0.8]) + liquidity_pulse, 0.0)
         if new_size == 0:
             book.pop(price, None)
         else:
@@ -95,9 +99,10 @@ async def run_mock_capture(
             )
         )
 
-        trade_price = base_price + price_shift + rng.uniform(-2.0, 2.0)
-        qty = round(rng.uniform(0.02, 0.45), 6)
-        buyer_is_maker = i % 3 == 0
+        trade_price = base_price + price_shift + rng.uniform(-3.5, 3.5)
+        volatility_boost = 2.4 if steps * 0.42 < i < steps * 0.55 else 1.0
+        qty = round(rng.uniform(0.02, 0.55) * volatility_boost, 6)
+        buyer_is_maker = (i % 5 == 0) if i < steps * 0.55 else (i % 3 != 0)
         trade_side = "sell" if buyer_is_maker else "buy"
         if trade_side == "buy":
             buy_volume += qty
@@ -120,8 +125,9 @@ async def run_mock_capture(
             )
         )
 
-        best_bid = max(bids)
-        best_ask = min(asks)
+        best_bid = max(price for price in bids if price < base_price + price_shift + 25)
+        best_ask_candidates = [price for price in asks if price > best_bid]
+        best_ask = min(best_ask_candidates) if best_ask_candidates else best_bid + 0.5
         bid_depth = sum(size for _, size in sorted(bids.items(), reverse=True)[:5])
         ask_depth = sum(size for _, size in sorted(asks.items())[:5])
         depth_total = bid_depth + ask_depth
@@ -175,4 +181,3 @@ def _write_selected(dataset_type: str, store: MarketDataStore, dataset: str, row
 def _levels_json(levels: dict[float, float], reverse: bool = False) -> str:
     ordered = sorted(levels.items(), reverse=reverse)[:10]
     return json.dumps([[round(price, 2), round(size, 6)] for price, size in ordered])
-

@@ -25,7 +25,7 @@ async def run() -> None:
     config = PipelineConfig(
         symbol="BTCUSDT",
         output_path=output_path,
-        capture_duration_seconds=1.2,
+        capture_duration_seconds=18.0,
         dataset_type="all",
         mode="mock",
         bar_ms=100,
@@ -42,10 +42,13 @@ async def run() -> None:
     counts = await run_mock_capture(config, store, latency)
     assert counts["raw_agg_trades"] > 0
     assert counts["raw_depth"] > 0
+    assert counts["book_change_events"] > 0
     assert counts["features"] > 0
+    assert counts["snapshots"] >= 2
 
     trades = read_dataset(output_path, "raw_agg_trades")
     depth = read_dataset(output_path, "raw_depth")
+    changes = read_dataset(output_path, "book_change_events")
     features = read_dataset(output_path, "features")
 
     expected_trade_columns = {"event_ts", "trade_id", "price", "quantity", "buyer_is_maker", "trade_side"}
@@ -55,6 +58,10 @@ async def run() -> None:
     assert expected_trade_columns.issubset(trades.columns), trades.columns
     assert expected_depth_columns.issubset(depth.columns), depth.columns
     assert expected_feature_columns.issubset(features.columns), features.columns
+    assert {"event_ts", "side", "price", "delta_size", "change_type"}.issubset(changes.columns), changes.columns
+    assert len(features) >= 100
+    assert features["spread"].ge(0).all()
+    assert features["order_flow_imbalance"].between(-1, 1).all()
 
     chart = build_research_charts(output_path, charts_path)["chart"]
 

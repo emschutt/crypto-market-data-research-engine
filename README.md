@@ -4,7 +4,7 @@ A standalone Binance high-frequency market-data pipeline for crypto market micro
 
 The project focuses only on data collection, storage, diagnostics, export, and research. It does not contain order placement, strategy engines, risk management, portfolio accounting, wallets, private keys, or credentials.
 
-![Market microstructure summary](charts/market_microstructure_summary.png)
+![Market microstructure dashboard](charts/market_microstructure_dashboard.png)
 
 ## What It Does
 
@@ -123,7 +123,7 @@ Useful options:
 
 ## Smoke Test
 
-The smoke test runs the deterministic mock collector, writes Parquet datasets, reads them back, verifies expected columns, and generates the chart shown at the top of this README.
+The smoke test runs the deterministic mock collector, writes Parquet datasets, reads them back, verifies expected columns and feature ranges, and generates the large dashboard shown at the top of this README.
 
 Command used:
 
@@ -136,9 +136,9 @@ Passing result from the local run:
 ```text
 SMOKE TEST PASSED
 output_path=sample_data/smoke
-datasets_written={'raw_depth': 12, 'raw_agg_trades': 12, 'book_change_events': 12, 'features': 12, 'snapshots': 2}
-latency=[{'source': 'mock.agg_trade', 'samples': 12, 'average_ms': 5.75, 'min_ms': 4.0, 'max_ms': 8.0}, {'source': 'mock.depth', 'samples': 12, 'average_ms': 5.75, 'min_ms': 4.0, 'max_ms': 8.0}]
-chart=charts/market_microstructure_summary.png
+datasets_written={'raw_depth': 180, 'raw_agg_trades': 180, 'book_change_events': 180, 'features': 180, 'snapshots': 2}
+latency=[{'source': 'mock.agg_trade', 'samples': 180, 'average_ms': 6.0, 'min_ms': 4.0, 'max_ms': 8.0}, {'source': 'mock.depth', 'samples': 180, 'average_ms': 6.0, 'min_ms': 4.0, 'max_ms': 8.0}]
+chart=charts/market_microstructure_dashboard.png
 ```
 
 ## Analysis

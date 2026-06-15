@@ -1,0 +1,8 @@
+{
+  "dataset": "raw_depth",
+  "symbol": "BTCUSDT",
+  "rows": 180,
+  "format": "parquet",
+  "first_timestamp": "2026-06-15 21:35:06+00:00",
+  "last_timestamp": "2026-06-15 21:35:23.900000+00:00"
+}
