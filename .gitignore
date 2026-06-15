@@ -1,17 +1,13 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-venv/
-.env
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
 .DS_Store
+*.user
+*.suo
 
 data/
 logs/
 tmp/
 *.log
-
-.ipynb_checkpoints/
-

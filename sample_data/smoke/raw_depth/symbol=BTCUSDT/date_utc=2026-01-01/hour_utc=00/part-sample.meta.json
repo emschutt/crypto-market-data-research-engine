@@ -1,0 +1,9 @@
+{
+  "dataset": "raw_depth",
+  "symbol": "BTCUSDT",
+  "exchange": "binance",
+  "rows": 300,
+  "hour_utc": "2026-01-01T00:00:00.0000000Z",
+  "file": "part-sample.parquet",
+  "schema_version": "event-level-v1"
+}
