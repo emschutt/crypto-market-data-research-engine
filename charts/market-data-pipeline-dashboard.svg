@@ -36,21 +36,18 @@
   <text x="1100" y="176" text-anchor="middle" class="title">BTCUSDT Market Data Research Dashboard</text>
   <text x="1100" y="224" text-anchor="middle" class="subtitle">High-frequency aggregate trades, L5 depth features, order-flow imbalance, OHLC candles, and latency diagnostics</text>
 
-    <rect x="150" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
-  <text x="178" y="346" class="metric" fill="#53f3c3">1000</text>
-  <text x="178" y="386" class="label">TRADES</text>
-    <rect x="540" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
-  <text x="568" y="346" class="metric" fill="#7cc7ff">1000</text>
-  <text x="568" y="386" class="label">DEPTH UPDATES</text>
-    <rect x="930" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
-  <text x="958" y="346" class="metric" fill="#ffd166">1000</text>
-  <text x="958" y="386" class="label">FEATURE ROWS</text>
-    <rect x="1320" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1348" y="346" class="metric" fill="#ffcf5c">1.462 USDT</text>
-  <text x="1348" y="386" class="label">AVG SPREAD</text>
-    <rect x="1710" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1738" y="346" class="metric" fill="#c4a7ff">6.551 ms</text>
-  <text x="1738" y="386" class="label">AVG LATENCY</text>
+      <rect x="150" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
+  <text x="178" y="346" class="metric" fill="#7cc7ff">1000</text>
+  <text x="178" y="386" class="label">DEPTH UPDATES</text>
+      <rect x="540" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
+  <text x="568" y="346" class="metric" fill="#ffd166">1000</text>
+  <text x="568" y="386" class="label">FEATURE ROWS</text>
+      <rect x="930" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
+  <text x="958" y="346" class="metric" fill="#ffcf5c">1.462 USDT</text>
+  <text x="958" y="386" class="label">AVG SPREAD</text>
+      <rect x="1320" y="290" width="340" height="130" rx="24" fill="#101d31" stroke="#2c425e" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1348" y="346" class="metric" fill="#c4a7ff">6.551 ms</text>
+  <text x="1348" y="386" class="label">AVG LATENCY</text>
 
     <rect x="150" y="500" width="1900" height="350" rx="26" class="panel" filter="url(#shadow)"/>
   <text x="186" y="546" class="panel-title">OHLC Candles From Aggregate Trades</text>

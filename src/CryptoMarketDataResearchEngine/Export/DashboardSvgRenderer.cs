@@ -132,11 +132,10 @@ public static class DashboardSvgRenderer
   <text x="{{Width / 2}}" y="176" text-anchor="middle" class="title">{{Escape(options.SymbolUpper)}} Market Data Research Dashboard</text>
   <text x="{{Width / 2}}" y="224" text-anchor="middle" class="subtitle">High-frequency aggregate trades, L5 depth features, order-flow imbalance, OHLC candles, and latency diagnostics</text>
 
-  {{MetricCard(ContentX, 290, 340, "Trades", Count(rows, Datasets.RawAggTrades).ToString(CultureInfo.InvariantCulture), "#53f3c3")}}
-  {{MetricCard(ContentX + 390, 290, 340, "Depth Updates", Count(rows, Datasets.RawDepth).ToString(CultureInfo.InvariantCulture), "#7cc7ff")}}
-  {{MetricCard(ContentX + 780, 290, 340, "Feature Rows", chartCount.ToString(CultureInfo.InvariantCulture), "#ffd166")}}
-  {{MetricCard(ContentX + 1170, 290, 340, "Avg Spread", $"{N(avgSpread, "0.###")} USDT", "#ffcf5c")}}
-  {{MetricCard(ContentX + 1560, 290, 340, "Avg Latency", $"{N(avgLatency, "0.###")} ms", "#c4a7ff")}}
+    {{MetricCard(ContentX, 290, 340, "Depth Updates", Count(rows, Datasets.RawDepth).ToString(CultureInfo.InvariantCulture), "#7cc7ff")}}
+    {{MetricCard(ContentX + 390, 290, 340, "Feature Rows", chartCount.ToString(CultureInfo.InvariantCulture), "#ffd166")}}
+    {{MetricCard(ContentX + 780, 290, 340, "Avg Spread", $"{N(avgSpread, "0.###")} USDT", "#ffcf5c")}}
+    {{MetricCard(ContentX + 1170, 290, 340, "Avg Latency", $"{N(avgLatency, "0.###")} ms", "#c4a7ff")}}
 
   {{panels}}
 </svg>
