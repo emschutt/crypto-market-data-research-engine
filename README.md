@@ -4,7 +4,7 @@ Standalone C#/.NET market-data pipeline for collecting Binance high-frequency cr
 
 This repository is intentionally focused on data engineering and quant research. It contains only public market-data extraction, treatment, diagnostics, and storage code.
 
-![Generated market data dashboard](charts/market-data-pipeline-dashboard.svg)
+![Generated market data dashboard](charts/market-data-dashboard.png)
 
 ## What It Does
 
@@ -17,7 +17,7 @@ The project captures Binance market data at event level and writes typed dataset
 - Writes raw depth frames, raw aggregate trades, book-change rows, derived features, and snapshots.
 - Stores each dataset as hive-partitioned Parquet.
 - Tracks receive latency for WebSocket diagnostics.
-- Produces a large centered SVG dashboard with stacked time-series panels, OHLC candles, volume, spread, imbalance, depth, book-change mix, latency, and dataset health.
+- Produces a clean matplotlib PNG dashboard with labeled axes, units of measure, UTC x-axis ticks, OHLC candles, volume, spread, imbalance, and latency.
 - Includes a smoke test that runs the full mock pipeline, writes Parquet, reads it back, validates columns, checks data-quality invariants, and exits successfully.
 
 ## Architecture
@@ -36,7 +36,7 @@ flowchart LR
     I --> J
     B --> J
     J --> K[Hive-partitioned research datasets]
-    J --> L[Dashboard SVG]
+    J --> L[Matplotlib dashboard PNG]
 ```
 
 The live collector connects to:
@@ -75,7 +75,10 @@ crypto-market-data-research-engine/
 ├── sample_data/
 │   └── smoke/
 ├── charts/
+│   ├── market-data-dashboard.png
 │   └── market-data-pipeline-dashboard.svg
+├── scripts/
+│   └── plot_dashboard.py
 ├── .env.example
 └── .gitignore
 ```
@@ -108,30 +111,45 @@ Checks that captured values are internally coherent. The smoke test fails if any
 
 `Export/DashboardSvgRenderer.cs`
 
-Generates the large dashboard image at `charts/market-data-pipeline-dashboard.svg` after collection. The dashboard is built from the same captured rows that are sent to Parquet, using a bounded in-memory sample so the visualization stays tied to the actual pipeline output.
+Generates a diagnostic SVG at `charts/market-data-pipeline-dashboard.svg` after collection. The SVG is useful for quick pipeline checks, but the reviewer-facing chart is the matplotlib PNG.
+
+`scripts/plot_dashboard.py`
+
+Reads the Parquet outputs and renders the clean matplotlib dashboard at `charts/market-data-dashboard.png`.
 
 ## Dashboard
 
-The generated SVG is intentionally arranged as a single centered research dashboard instead of a two-column grid. All time-series panels are stacked vertically so each chart has the same width and comparable time axis.
+The reviewer-facing dashboard is generated with matplotlib from the Parquet outputs. It uses a simpler six-panel layout with axis labels, units of measure, visible y-axis ticks, and UTC x-axis ticks on every subplot.
 
-Dashboard panels (simplified):
+Dashboard panels:
 
 - OHLC candlesticks built from aggregate trade prices (time-bucketed).
 - Midprice, best bid, and best ask reconstructed from the treated L5 book (L1 quote).
 - Aggregate buy/sell trade volume (stacked bars).
-- WebSocket latency diagnostics for aggregate trades and depth updates.
-- Dataset health table with row counts and latency summary.
+- Order-flow imbalance and trade imbalance.
+- WebSocket receive latency for aggregate trades and depth updates.
 
 Notes:
 
-- Visualizations are downsampled to a maximum of 500 plotted datapoints per series to keep the SVG size reasonable while preserving the full captured dataset for auditing and metrics.
-- The dashboard renderer now draws x-axis time ticks and a time legend for each panel.
-- Metric cards use the full, undownsampled row counts so captured-data counts remain accurate.
-- The dashboard SVG is produced by `Export/DashboardSvgRenderer.cs` and written to `charts/market-data-pipeline-dashboard.svg`.
-- To regenerate the dashboard as part of the smoke test, run:
+- The matplotlib dashboard reads the actual Parquet files, not separate mock plotting data.
+- Every subplot has `Time (UTC)` on the x-axis.
+- Price and spread axes are labeled in `USDT`.
+- Trade volume is labeled in `BTC`.
+- Imbalance axes are labeled as ratios.
+- Latency is labeled in milliseconds.
+- To regenerate Parquet data and the diagnostic SVG as part of the smoke test, run:
 
 ```bash
 dotnet run --project tests/CryptoMarketDataResearchEngine.SmokeTests
+```
+
+Then render the clean matplotlib PNG:
+
+```bash
+python3 scripts/plot_dashboard.py \
+  --input sample_data/smoke \
+  --output charts/market-data-dashboard.png \
+  --symbol BTCUSDT
 ```
 
 Latency interpretation:
@@ -335,6 +353,7 @@ For live runs, row-count minimums are reported but not enforced because short ca
 - .NET SDK 10.0 or newer.
 - Internet access for live Binance collection.
 - No API key is needed for public Binance market data.
+- Optional matplotlib dashboard dependencies: `pandas`, `pyarrow`, `matplotlib`, and `numpy`.
 
 Check your .NET SDK:
 
@@ -396,7 +415,7 @@ Passing result from this local run:
 ```text
 SMOKE TEST PASSED
 output_path=sample_data/smoke
-rows_written={"raw_depth":1000,"raw_agg_trades":1000,"book_change_events":3995,"features":1000,"snapshots":1}
+rows_written={"raw_depth":1000,"raw_agg_trades":1000,"book_change_events":3990,"features":1000,"snapshots":1}
 quality_checks=34/34 passed
 chart=charts/market-data-pipeline-dashboard.svg
 ```
@@ -459,6 +478,34 @@ dotnet run --project src/CryptoMarketDataResearchEngine -- inspect --output samp
 ```
 
 The inspect command lists each dataset, the number of Parquet files, row groups, and detected columns.
+
+## Render The Matplotlib Dashboard
+
+Install visualization dependencies if needed:
+
+```bash
+python3 -m pip install -r visualization-requirements.txt
+```
+
+Generate the clean PNG dashboard:
+
+```bash
+python3 scripts/plot_dashboard.py \
+  --input sample_data/smoke \
+  --output charts/market-data-dashboard.png \
+  --symbol BTCUSDT
+```
+
+Expected smoke-sample plotting output:
+
+```text
+dashboard=.../charts/market-data-dashboard.png
+avg_spread_usdt=0.080810
+max_spread_usdt=0.120000
+avg_latency_ms=6.548889
+```
+
+The mock spread is intentionally small after the latest sanity pass. An average spread around `0.08 USDT` for BTCUSDT demo data is reasonable; the earlier `1.46 USDT` average was too wide for a liquid Binance-style sample and came from the previous mock spread generator.
 
 ## Research Ideas
 

@@ -335,7 +335,9 @@ public static class DashboardSvgRenderer
             }
 
             var status = rc == 0 ? "MISSING" : (start.HasValue ? "OK" : "WARN");
-            var rangeText = start.HasValue ? $"{start.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} - {end.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} UTC" : "n/a";
+            var rangeText = start.HasValue && end.HasValue
+                ? $"{start.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} - {end.Value.ToUniversalTime():yyyy-MM-dd HH:mm:ss} UTC"
+                : "n/a";
 
             sb.AppendLine($$"""<text x="{{F(x + 32)}}" y="{{F(yy)}}" class="legend">{{Escape(ds)}}</text>""");
             sb.AppendLine($$"""<text x="{{F(x + 420)}}" y="{{F(yy)}}" class="legend">{{rc}}</text>""");

@@ -53,7 +53,7 @@ public sealed class MockBinanceCollector : IMarketDataCollector
             if (i > events * 0.70) priceShift -= 14.0;
 
             var quoteMid = basePrice + priceShift;
-            var halfSpread = 0.25 + Math.Abs(Math.Sin(i / 29.0)) * 0.75;
+            var halfSpread = 0.01 + Math.Abs(Math.Sin(i / 29.0)) * 0.04 + rng.NextDouble() * 0.01;
             var bidPrice = Math.Round(quoteMid - halfSpread, 2);
             var askPrice = Math.Round(quoteMid + halfSpread, 2);
             var bidSize = Math.Round(Math.Max(0.05, 1.0 + Math.Sin(i / 13.0) * 0.7 + rng.NextDouble() * 0.8), 6);
