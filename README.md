@@ -6,6 +6,8 @@ This repository is intentionally focused on data engineering and quant research.
 
 ![Generated market data dashboard](charts/market-data-dashboard.png)
 
+The dashboard above is generated from the committed smoke-test Parquet output in `sample_data/smoke`, not from hand-entered chart data. Its provenance is recorded in `charts/market-data-dashboard.provenance.json`.
+
 ## What It Does
 
 The project captures Binance market data at event level and writes typed datasets that can be used for market microstructure research.
@@ -76,6 +78,7 @@ crypto-market-data-research-engine/
 │   └── smoke/
 ├── charts/
 │   ├── market-data-dashboard.png
+│   ├── market-data-dashboard.provenance.json
 │   └── market-data-pipeline-dashboard.svg
 ├── scripts/
 │   └── plot_dashboard.py
@@ -115,7 +118,7 @@ Generates a diagnostic SVG at `charts/market-data-pipeline-dashboard.svg` after 
 
 `scripts/plot_dashboard.py`
 
-Reads the Parquet outputs and renders the clean matplotlib dashboard at `charts/market-data-dashboard.png`.
+Reads the Parquet outputs and renders the clean matplotlib dashboard at `charts/market-data-dashboard.png`. The README image is rendered from `sample_data/smoke`, which is the deterministic smoke-test output.
 
 ## Dashboard
 
@@ -149,6 +152,7 @@ Then render the clean matplotlib PNG:
 python3 scripts/plot_dashboard.py \
   --input sample_data/smoke \
   --output charts/market-data-dashboard.png \
+  --provenance charts/market-data-dashboard.provenance.json \
   --symbol BTCUSDT
 ```
 
@@ -493,6 +497,7 @@ Generate the clean PNG dashboard:
 python3 scripts/plot_dashboard.py \
   --input sample_data/smoke \
   --output charts/market-data-dashboard.png \
+  --provenance charts/market-data-dashboard.provenance.json \
   --symbol BTCUSDT
 ```
 
@@ -500,6 +505,7 @@ Expected smoke-sample plotting output:
 
 ```text
 dashboard=.../charts/market-data-dashboard.png
+provenance=.../charts/market-data-dashboard.provenance.json
 avg_spread_usdt=0.080810
 max_spread_usdt=0.120000
 avg_latency_ms=6.548889

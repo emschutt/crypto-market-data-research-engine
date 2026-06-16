@@ -8,6 +8,7 @@ only a visualization layer for reviewer-friendly static charts.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib.dates as mdates
@@ -112,12 +113,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Render a clean market-data dashboard from Parquet outputs.")
     parser.add_argument("--input", default="sample_data/smoke", help="Root path containing dataset partitions.")
     parser.add_argument("--output", default="charts/market-data-dashboard.png", help="PNG output path.")
+    parser.add_argument("--provenance", default="charts/market-data-dashboard.provenance.json", help="JSON file describing the data used for the dashboard.")
     parser.add_argument("--symbol", default="BTCUSDT", help="Symbol label for the dashboard.")
     args = parser.parse_args()
 
     root = Path(args.input)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
+    provenance = Path(args.provenance)
+    provenance.parent.mkdir(parents=True, exist_ok=True)
 
     trades = read_dataset(root, DATASETS["trades"])
     features = read_dataset(root, DATASETS["features"])
@@ -226,7 +230,29 @@ def main() -> int:
             label.set_ha("center")
 
     fig.savefig(output, dpi=180, facecolor=fig.get_facecolor())
+    provenance.write_text(
+        json.dumps(
+            {
+                "dashboard": str(output),
+                "input_root": str(root),
+                "source": "smoke-test Parquet output" if root.as_posix() == "sample_data/smoke" else "Parquet output",
+                "datasets": {
+                    "raw_agg_trades": {"rows": int(len(trades)), "files": len(list((root / DATASETS["trades"]).glob("**/*.parquet")))},
+                    "raw_depth": {"rows": int(len(depth)), "files": len(list((root / DATASETS["depth"]).glob("**/*.parquet")))},
+                    "features": {"rows": int(len(features)), "files": len(list((root / DATASETS["features"]).glob("**/*.parquet")))},
+                },
+                "metrics": {
+                    "avg_spread_usdt": round(float(avg_spread), 6),
+                    "max_spread_usdt": round(float(max_spread), 6),
+                    "avg_latency_ms": round(float(avg_latency), 6),
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     print(f"dashboard={output.resolve()}")
+    print(f"provenance={provenance.resolve()}")
     print(f"avg_spread_usdt={avg_spread:.6f}")
     print(f"max_spread_usdt={max_spread:.6f}")
     print(f"avg_latency_ms={avg_latency:.6f}")

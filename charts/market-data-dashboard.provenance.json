@@ -1,0 +1,24 @@
+{
+  "dashboard": "charts/market-data-dashboard.png",
+  "input_root": "sample_data/smoke",
+  "source": "smoke-test Parquet output",
+  "datasets": {
+    "raw_agg_trades": {
+      "rows": 1000,
+      "files": 1
+    },
+    "raw_depth": {
+      "rows": 1000,
+      "files": 1
+    },
+    "features": {
+      "rows": 1000,
+      "files": 1
+    }
+  },
+  "metrics": {
+    "avg_spread_usdt": 0.08081,
+    "max_spread_usdt": 0.12,
+    "avg_latency_ms": 6.548889
+  }
+}
